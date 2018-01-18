@@ -1,3 +1,13 @@
+/* 
+# Title: main.c - Full implementation of the carbon_rover project
+#                 Implements reading from HCSR04 ultrasonic sensors
+#                 Implements reading from IR Edge Detection sensor
+#                 Impliments controlling L9110S Motor Controller
+# Author: Sahaj Sarup
+# Copyright (c) 2018 Linaro Limited
+#################################################################
+*/
+
 #include <zephyr.h>
 #include <device.h>
 #include <gpio.h>
