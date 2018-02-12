@@ -3,6 +3,7 @@
 #                 Implements reading from HCSR04 ultrasonic sensors
 #                 Implements reading from IR Edge Detection sensor
 #                 Impliments controlling L9110S Motor Controller
+#                 Impliments controliing Neopixels using I2C over Arduino
 # Author: Sahaj Sarup
 # Copyright (c) 2018 Linaro Limited
 #################################################################
@@ -15,10 +16,11 @@
 #include <sys_clock.h>
 #include <misc/util.h>
 #include <string.h>
+#include <i2c.h>
 
 #define PORT	"GPIOA"
-#define PORT2 "GPIOB"
-#define PORT3 "GPIOC"
+#define PORT2	"GPIOB"
+#define PORT3	"GPIOC"
 
 // Motor Controller Pins GPIOA
 #define A1A	0
@@ -35,33 +37,40 @@
 // Ultrasonic Sensor Pins
 #define TRIGFL	2 //GPIOC
 #define ECHOFL	4
-#define TRIGFC	3 //GPIOC
-#define ECHOFC	5
-#define TRIGFR	6 //GPIOC
-#define ECHOFR	8
+#define TRIGFR	3 //GPIOC
+#define ECHOFR	5
+#define TRIGFC	6 //GPIOC
+#define ECHOFC	8
 #define TRIGBR	7 //GPIOC
 #define ECHOBR	9
-#define TRIGBC	6 //GPIOB
-#define ECHOBC	7
+#define TRIGBC	3 //GPIOB
+#define ECHOBC	10
 #define TRIGBL	8 //GPIOB
 #define ECHOBL	9
 
 #define SLEEP_TIME 1000
 
+#define US_LIMIT_CYCLE 487200 //100cm for 84MHz (((MAX_RANGE * 58000) / 1000000000) * (CLOCK * 1000000)
+#define US_LIMIT 100
+
 #define STACKSIZE 1024
 #define PRIORITY 7
 
-#define DELAY K_MSEC(10)
+#define DELAY K_MSEC(0.05)
 
-static K_THREAD_STACK_ARRAY_DEFINE(stacks, 3, STACKSIZE);
-static struct k_thread __kernel threads[3];
+#define I2C_DEV CONFIG_I2C_1_NAME
+
+static K_THREAD_STACK_ARRAY_DEFINE(stacks, 4, STACKSIZE);
+static struct k_thread __kernel threads[4];
 
 static struct device *gpioa;
 static struct device *gpiob;
 static struct device *gpioc;
-
+static struct device *i2c_dev;
+ 
 static uint32_t dir = 0, irfr = 0, irfl = 0, irbr = 0, irbl = 0, us_fl = 0, us_fc = 0, us_fr = 0, us_br = 0, us_bc = 0, us_bl = 0;
 static char tdir[10] = "n";
+static int ret;
 
 
 void fwd();
@@ -72,11 +81,21 @@ void right();
 void read_us();
 void read_ir();
 void run();
+void us_led();
+void pixel();
+void debug_out(); //This function can be used to debug the application. Call it anywhere in the threads to see the Rover parameters over serial.
 uint32_t get_us(uint32_t trig, uint32_t echo, struct device *dev);
 
 void main(void)
 {
-	int ret;
+	k_sleep(2000); //waiting for arduino to init
+	
+	i2c_dev = device_get_binding(I2C_DEV);
+	
+	if (!i2c_dev) {
+		printk("I2C: Device driver not found.\n");
+		return;
+	}	
 
 	gpioa = device_get_binding(PORT);
 	if (!gpioa) {
@@ -201,8 +220,8 @@ void main(void)
 
 	//Start threads
 	k_thread_create(&threads[0], &stacks[0][0], STACKSIZE, read_us, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
-	k_thread_create(&threads[1], &stacks[1][0], STACKSIZE, read_ir, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
-	k_thread_create(&threads[2], &stacks[2][0], STACKSIZE, run, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
+	k_thread_create(&threads[1], &stacks[1][0], STACKSIZE, run, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
+	k_thread_create(&threads[2], &stacks[2][0], STACKSIZE, pixel, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
 }
 
 void bwd()
@@ -257,16 +276,16 @@ uint32_t get_us(uint32_t trig, uint32_t echo, struct device *dev)
 	uint32_t stop_time;
 	uint32_t start_time;
 	gpio_pin_write(dev, trig, 1);
-	k_sleep(K_MSEC(10));
+	k_sleep(DELAY);
 	gpio_pin_write(dev, trig, 0);
 	start_time = k_cycle_get_32();
 	do {
 		gpio_pin_read(dev, echo, &val);
 		stop_time = k_cycle_get_32();
 		cycles_spent = stop_time - start_time;
-		if (cycles_spent > 243600) //50cm for 84MHz (((MAX_RANGE * 58000) / 1000000000) * (CLOCK * 1000000))
+		if (cycles_spent > US_LIMIT_CYCLE)
 		{
-			return 50;
+			return US_LIMIT;
 		}
 	} while (val == 0);
 	start_time = k_cycle_get_32();
@@ -275,24 +294,25 @@ uint32_t get_us(uint32_t trig, uint32_t echo, struct device *dev)
 		gpio_pin_read(dev, echo, &val);
 		stop_time = k_cycle_get_32();
 		cycles_spent = stop_time - start_time;
+		if (cycles_spent > US_LIMIT_CYCLE)
+		{
+			return US_LIMIT;
+		}
 	} while (val == 1);
 	nanseconds_spent = SYS_CLOCK_HW_CYCLES_TO_NS(cycles_spent);
 	cm = nanseconds_spent / 58000;
 	//printk("%d\n", cm);
 	return cm;
-	k_sleep(DELAY);
 }
 
 void read_ir()
 {
-	while(1)
-	{
-		gpio_pin_read(gpiob, IRFR, &irfr);
-		gpio_pin_read(gpiob, IRFL, &irfl);
-		gpio_pin_read(gpiob, IRBR, &irbr);
-		gpio_pin_read(gpiob, IRBL, &irbl);
-		k_sleep(DELAY);
-	}
+
+	gpio_pin_read(gpiob, IRFR, &irfr);
+	gpio_pin_read(gpiob, IRFL, &irfl);
+	gpio_pin_read(gpiob, IRBR, &irbr);
+	gpio_pin_read(gpiob, IRBL, &irbl);
+
 }
 
 void read_us()
@@ -305,20 +325,22 @@ void read_us()
 		us_br = get_us(TRIGBR, ECHOBR, gpioc);
 		us_bc = get_us(TRIGBC, ECHOBC, gpiob);
 		us_bl = get_us(TRIGBL, ECHOBL, gpiob);
-		k_sleep(DELAY);
+		k_yield();
 	}
 }
 
-void uart_out()
+void debug_out()
 {
-		printk("Front Left US: %d\tFront Center US: %d\tFront Right US: %d\nBack Right US: %d\tBack Center US: %d\tBack Letf US: %d\nFront Right IR: %d\tFront Left IR: %d\nBack Right IR: %d\tBack Letf IR: %d\nDirection: %s\n", us_fl, us_fc, us_fr, us_br, us_bc, us_bl, irfr, irfl, irbr, irbl, tdir);
+	printk("Front Left US: %d\tFront Center US: %d\tFront Right US: %d\nBack Right US: %d\tBack Center US: %d\tBack Letf US: %d\nFront Right IR: %d\tFront Left IR: %d\nBack Right IR: %d\tBack Letf IR: %d\nDirection: %s\n", us_fl, us_fc, us_fr, us_br, us_bc, us_bl, irfr, irfl, irbr, irbl, tdir);
 }
 
 void run()
 {
 	while (1) {
 
-		if((irfr == 0 && irfl == 0 && irbr == 0 && irbl == 0) || (us_fc < 15 && us_bc < 15))
+		read_ir();
+
+		if((irfr == 0 && irfl == 0 && irbr == 0 && irbl == 0) || (us_fc < 15 && us_bc < 15) || (us_fc < 15 && irbr == 0 && irbl == 0) || (us_bc < 15 && irfr == 0 && irfl == 0))
 		{
 			stop();
 			dir = 0;
@@ -371,8 +393,132 @@ void run()
 				dir = 0;
 			}
 		}
-		uart_out();
-
-		k_sleep(DELAY);
+		k_yield();
 	}
 }
+
+void pixel()
+{
+	while(1)
+	{
+		us_led();
+		k_yield();
+	}
+}
+
+void us_led()
+{
+ 	uint8_t data[22][4];
+
+	for (int i = 0; i < 4; i++)
+	{
+		if(irfl == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_fl*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_fl*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+
+	for (int i = 4; i < 7; i++)
+	{
+		if(irfl == 0 && irfr == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_fc*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_fc*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+
+	for (int i = 7; i < 11; i++)
+	{
+		if(irfr == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_fr*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_fr*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+
+	for (int i = 11; i < 15; i++)
+	{
+		if(irbr == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_br*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_br*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+
+	for (int i = 15; i < 18; i++)
+	{
+		if(irbr == 0 && irbl == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_bc*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_bc*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+
+
+	for (int i = 18; i < 22; i++)
+	{
+		if(irbl == 0)
+		{
+			data[i][0] = i;
+			data[i][1] = 255;
+			data[i][3] = 0;
+			data[i][2] = 0;
+		}
+		else
+		{	data[i][0] = i;
+			data[i][1] = 255 - ((((us_bl*100)/US_LIMIT)*255)/100);
+			data[i][3] = ((((us_bl*100)/US_LIMIT)*255)/100);
+			data[i][2] = 0;
+		}
+	}
+	
+	for (int i = 0; i < 22; i++)
+	{
+		ret = i2c_write(i2c_dev, data[i], 4, 13);
+		k_sleep(DELAY);
+	}
+
+
+}
+

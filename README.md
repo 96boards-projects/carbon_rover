@@ -1,11 +1,32 @@
 # Carbon Rover
 
+**Rev 2:**
+
+Change log:
+- Reduced response time:
+  - Threads now use k_yield() in place of k_sleep() to switch threads.
+- NeoPixels over i2c
+  - 22 Neopixels arranged around the outer edges of the rover change color according to the output of the ultrasonic sensors.
+  - Arduino is used to directly convert i2c data to output for NeoPixels.
+  - Carbon sends the i2c data in 4 bytes per pixel.
+    - Byte 1: Pixel Location on the strip
+    - Byte 2: Red 0-255
+    - Byte 3: Green 0-255
+    - Byte 4: Blue 0-255
+- Miscellaneous Pinout Changes.
+
+***
+
+**[Rev 1:](https://github.com/96boards-projects/carbon_rover/releases/tag/v1.0)**
+
 The Carbon Rover is a 4 WD Robot that uses 6 ultrasonic sensors and 4 IR sensors for object and edge detection.
 The ultrasonic sensors make sure that the rover doesn't bump into objects in it's path and the IR sensors are used to detect edges so it doesn't fall off.
 
 The Rover is programmed using Zephyr RTOS and heavily relies on its multi-threading functionality to collect sensor data and control the motors at the same time.
 
-Since this is Rev 1. there is no control mechanism and the rover follows a pre-defined path, Rev 2 will possibly include control via Bluetooth.
+TODO:
+  - NeoPixel Implementation
+  - Bluetooth Controller Implementation
 
 # Table of Contents
 
@@ -30,6 +51,9 @@ Since this is Rev 1. there is no control mechanism and the rover follows a pre-d
 - [4x IR Edge Detection Sensors](https://www.robomart.com/ir-based-digital-color-sensor-black-white)
 - [1x L9110S Motor Controller](https://www.amazon.com/L9110S-Stepper-Driver-Atomic-Market/dp/B01ACIALJ4/ref=sr_1_1?ie=UTF8&qid=1516181215&sr=8-1&keywords=l9110s)
 - [1x 4WD Car Kit](https://www.amazon.in/Rees52-4-Wheel-Chassis-Encoder-Arduino/dp/B071Z3XTQH/ref=sr_1_6?s=industrial&ie=UTF8&qid=1516181373&sr=1-6&keywords=car+kit)
+- [22x NeoPixel LED Strip (Flexible)](https://www.amazon.com/Adafruit-NeoPixel-Digital-Weatherproof-LED-1m/dp/B072MNYMGS/ref=sr_1_7?ie=UTF8&qid=1518261705&sr=8-7&keywords=neopixel)
+- [1x Arduino Nano](https://store.arduino.cc/usa/arduino-nano)
+- [1x Logic Level Shifter](https://www.amazon.com/Logic-Converter-Bi-Directional-Module-Arduino/dp/B014MC1OAG/ref=sr_1_7?ie=UTF8&qid=1518261841&sr=8-7&keywords=logic+level+converter)
 - Miscellaneous: Quantity as per required:
   - Connecting wires
   - Soldering Kit
@@ -45,6 +69,8 @@ Since this is Rev 1. there is no control mechanism and the rover follows a pre-d
 	- [Linux](http://docs.zephyrproject.org/getting_started/installation_linux.html)
 	- [macOS](http://docs.zephyrproject.org/getting_started/installation_mac.html)
 	- [Windows](http://docs.zephyrproject.org/getting_started/installation_mac.html)
+- [Install Arduino IDE](https://www.arduino.cc/en/Main/Software)
+- [Install Adafruit NeoPixel Library](https://learn.adafruit.com/adafruit-neopixel-uberguide/arduino-library-installation)
 
 # 3) Carbon Rover
 
@@ -76,14 +102,14 @@ Since this is Rev 1. there is no control mechanism and the rover follows a pre-d
 |:---------------------------|------------|
 | Front Left Trigger         | PC2        |
 | Front Left Echo            | PC4        |
-| Front Center Trigger       | PC3        |
-| Front Center Echo          | PC5        |
-| Front Right Trigger        | PC6        |
-| Front Right Echo           | PC8        |
+| Front Center Trigger       | PC6        |
+| Front Center Echo          | PC8        |
+| Front Right Trigger        | PC3        |
+| Front Right Echo           | PC5        |
 | Back Right Trigger         | PC7        |
 | Back Right Echo            | PC9        |
-| Back Center Trigger        | PB6        |
-| Back Center Echo           | PB7        |
+| Back Center Trigger        | PB3        |
+| Back Center Echo           | PB10       |
 | Back Left Trigger          | PB8        |
 | Back Left Echo             | PB9        |
 | +                          | +5v        |
@@ -97,6 +123,25 @@ Since this is Rev 1. there is no control mechanism and the rover follows a pre-d
 | A1-B             | PA2    |
 | B1-A             | PA3    |
 | B1-B             | PA1    |
+
+### Arduino to Carbon
+
+**NOTE: This uses a Bi-directional Logic Level Shifter to shift from 5v Logic to 3v3 Logic. This Setup might work without a LLS using Arduino Pro Mini but has not been tested**
+
+| Arduino Nano | Level Shifter HV | <-> | Level Shifter LV | Carbon     |
+|:------------:|:----------------:|:---:|:----------------:|:----------:|
+| A5 (SCL)     | HV1              | <-> | LV1              | PB6 (SCL)  |
+| A4 (SDA)     | HV2              | <-> | LV2              | PB7 (SDA)  |
+| 5V           | HV               | <-> | LV               | VCC2 (3v3) |
+| GND          | GND              | <-> | GND              | GND        |
+
+### Arduino to NeoPixel
+
+| Arduino Nano | NeoPixel |
+|:------------:|:--------:|
+| D9           | DIN      |
+| 5v           | VCC/5V   |
+| GND          | GND      |
 
 ## 3.2) Building and Flashing
 
@@ -127,8 +172,13 @@ usb 1-2.1: SerialNumber: 3574364C3034
 ```shell
 $ sudo make flash
 ```
+
+- [Flash the arduino_neopixel.ino file on the Arduino Nano](https://www.arduino.cc/en/Guide/Environment#toc9
+
 - At this moment your rover should come alive.
 
 ## 3.3) Video Demonstration
+
+**Rev 1**
 
 [![Demo](https://img.youtube.com/vi/BEC8CVmJyRc/0.jpg)](https://www.youtube.com/watch?v=BEC8CVmJyRc)
