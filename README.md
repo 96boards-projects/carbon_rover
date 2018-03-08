@@ -1,45 +1,5 @@
 # Carbon Rover
 
-**Rev 3:**
-
-Change Log:
-- BlueTooth Controller Support:
-  - Using HC-05 BT <-> UART Module
-- Miscellaneous:
-  - Code Cleanup
-  - Pinout Changes
-  - Uses non-upstream Zephyr branch for UART6
-
-***
-
-**[Rev 2:](https://github.com/96boards-projects/carbon_rover/releases/tag/v2.0)**
-
-Change log:
-- Reduced response time:
-  - Threads now use k_yield() in place of k_sleep() to switch threads.
-- NeoPixels over i2c
-  - 22 Neopixels arranged around the outer edges of the rover change color according to the output of the ultrasonic sensors.
-  - Arduino is used to directly convert i2c data to output for NeoPixels.
-  - Carbon sends the i2c data in 4 bytes per pixel.
-    - Byte 1: Pixel Location on the strip
-    - Byte 2: Red 0-255
-    - Byte 3: Green 0-255
-    - Byte 4: Blue 0-255
-- Miscellaneous Pinout Changes.
-
-***
-
-**[Rev 1:](https://github.com/96boards-projects/carbon_rover/releases/tag/v1.0)**
-
-The Carbon Rover is a 4 WD Robot that uses 6 ultrasonic sensors and 4 IR sensors for object and edge detection.
-The ultrasonic sensors make sure that the rover doesn't bump into objects in it's path and the IR sensors are used to detect edges so it doesn't fall off.
-
-The Rover is programmed using Zephyr RTOS and heavily relies on its multi-threading functionality to collect sensor data and control the motors at the same time.
-
-TODO:
-  - NeoPixel Implementation
-  - Bluetooth Controller Implementation
-
 # Table of Contents
 
 - [1) Hardware](#1-hardware)
@@ -50,7 +10,8 @@ TODO:
 - [4) Carbon Rover](#5-carbon-rover)
    - [4.1) Hardware setup](#51-hardware-setup)
    - [4.2) Building](#52-building)
-   - [4.3) Video Demonstration](#53-video-demonstration)
+- [5) Video Demonstration](#5-video-demonstration)
+- [6) Change Log](#6-change-log)
 
 # 1) Hardware
 
@@ -248,3 +209,45 @@ $ sudo make flash
 **Rev 1**
 
 [![Demo](https://img.youtube.com/vi/BEC8CVmJyRc/0.jpg)](https://www.youtube.com/watch?v=BEC8CVmJyRc)
+
+# 6) Change log:
+
+**Rev 3:**
+
+Change Log:
+- BlueTooth Controller Support:
+  - Using HC-05 BT <-> UART Module
+- Miscellaneous:
+  - Code Cleanup
+  - Pinout Changes
+  - Uses non-upstream Zephyr branch for UART6
+
+***
+
+**[Rev 2:](https://github.com/96boards-projects/carbon_rover/releases/tag/v2.0)**
+
+Change log:
+- Reduced response time:
+  - Threads now use k_yield() in place of k_sleep() to switch threads.
+- NeoPixels over i2c
+  - 22 Neopixels arranged around the outer edges of the rover change color according to the output of the ultrasonic sensors.
+  - Arduino is used to directly convert i2c data to output for NeoPixels.
+  - Carbon sends the i2c data in 4 bytes per pixel.
+    - Byte 1: Pixel Location on the strip
+    - Byte 2: Red 0-255
+    - Byte 3: Green 0-255
+    - Byte 4: Blue 0-255
+- Miscellaneous Pinout Changes.
+
+***
+
+**[Rev 1:](https://github.com/96boards-projects/carbon_rover/releases/tag/v1.0)**
+
+The Carbon Rover is a 4 WD Robot that uses 6 ultrasonic sensors and 4 IR sensors for object and edge detection.
+The ultrasonic sensors make sure that the rover doesn't bump into objects in it's path and the IR sensors are used to detect edges so it doesn't fall off.
+
+The Rover is programmed using Zephyr RTOS and heavily relies on its multi-threading functionality to collect sensor data and control the motors at the same time.
+
+TODO:
+  - NeoPixel Implementation
+  - Bluetooth Controller Implementation
