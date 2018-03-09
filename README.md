@@ -144,7 +144,7 @@
 | TX         | UART6* or UART2 RX |
 | STATE      | PC6                |
 
-**NOTE: The code is using UART6, but that is not working yet upstream. However if you want to use UART2 just modify the line ```#define UART_DEV CONFIG_UART_STM32_PORT_6_NAME``` in main.c and "CONFIG_UART_STM32_PORT_6=y" in prj.conf**
+**NOTE: The code is using UART6. However if you want to use UART2 just modify the line ```#define UART_DEV CONFIG_UART_STM32_PORT_6_NAME``` in main.c and "CONFIG_UART_STM32_PORT_6=y" in prj.conf**
 
 ### Arduino to Carbon
 
@@ -169,8 +169,6 @@
 
 - Clone This Repository
   ```$ git clone https://github.com/96boards-projects/carbon_rover```
-- If you want to use UART6, use this zephyr source branch
-  ```$ git clone https://github.com/ric96/zephyr -b uart6-96b_carbon```
 - Copy the folder ```rover``` into the root directory of Zephyr source.
 - Build
   ```shell
